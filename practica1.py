@@ -3,6 +3,8 @@ from pysnmp.proto.errind import DataMismatch
 import time
 import rrdtool
 import os
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 def checkdb(name):
     try:
         with open(name, 'r') as f:
@@ -227,19 +229,21 @@ def generarReporte():
     print("Tiempo desde el ultimo reinicio: "+str(tiempo)+"hrs")
     ip = walk(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.4.20.1.1",int(lines[int(op)].split("\t")[3].split(" ")[1]))
     print("Ip: "+ip)
-    inMulti = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.2.2.1.12.2",int(lines[int(op)].split("\t")[3].split(" ")[1]))
-    print("Multi: "+inMulti)
-    ipPackets = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.4.9.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
-    print("Ip Packets: "+ipPackets)
-    icmpMe = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.5.14.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
-    print("ICMP messageses out: "+icmpMe)
-    #Los dispositivos no soportaban el oid indicado
-    segOut = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.6.15.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
-    print("Segout: "+segOut)
     
-    datgramsIn = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.7.3.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
-    print("Datagrams in: "+datgramsIn)
     graph(lines[int(op)].split("\t")[0].split(" ")[1]+".rrd",int(timeini),int(timefin))
+    c = canvas.Canvas(lines[int(op)].split("\t")[0].split(" ")[1]+".pdf",pagesize=A4)
+    w, h = A4
+    if(sistema == "Linux"):
+        c.drawImage("linux.jpg",10,h-60,width=50,height=50)
+    else:
+        c.drawImage("windows.jpg",10,h-60,width=50,height=50)
+    c.setFont("Helvetica", 10)
+    c.drawString(65, h-25, "SO: "+sistema+"  Version: "+version+"  Ubicacion: "+ubicacion)
+    c.drawString(65, h-50, "Tiempo de actividad antes del ultimo reinicio: "+tiempo+"hrs  Comunidad: "+lines[int(op)].split("\t")[2].split(" ")[1]+"  IP: "+ip)
+    c.line(0,h-65,w,h-65)
+    c.save()
+   
+
 def capturar():
     file = open("data.txt","r")
     lines = file.readlines()
