@@ -163,35 +163,35 @@ def graph(name,ti,tf):
                      "--vertical-label=Paquetes/s",
                      "--title=Paquetes multicast recibidos",
                      "DEF:inmulti="+name+":inmulti:AVERAGE",
-                     "AREA:inmulti#00FF00:Paquetes recibidos")
+                     "AREA:inmulti#22577A:Paquetes recibidos")
     ret = rrdtool.graph( "ippackets.png",
                      "--start",str(ti),
                      "--end",str(tf),
                      "--vertical-label=Paquetes/s",
                      "--title=Paquetes recibidos exitosamente,entregados a\n protocolos IPv4",
                      "DEF:ippackets="+name+":ippackets:AVERAGE",
-                     "AREA:ippackets#00FF00:Paquetes recibidos")
+                     "LINE3:ippackets#38A3A5:Paquetes recibidos")
     ret = rrdtool.graph( "icmpme.png",
                      "--start",str(ti),
                      "--end",str(tf),
                      "--vertical-label=Mensajes/s",
                      "--title=Mensajes de respuesta ICMP que se han enviado",
                      "DEF:icmpme="+name+":icmpme:AVERAGE",
-                     "AREA:icmpme#00FF00:Mensaje enviados")
+                     "AREA:icmpme#57CC99:Mensaje enviados")
     ret = rrdtool.graph( "segout.png",
                      "--start",str(ti),
                      "--end",str(tf),
                      "--vertical-label=Segmentos/s",
                      "--title=Segmentos enviados que contienen la bandera RST",
                      "DEF:segout="+name+":segout:AVERAGE",
-                     "AREA:segout#00FF00:Segmentos enviados")
+                     "LINE3:segout#80ED99:Segmentos enviados")
     ret = rrdtool.graph( "datagramsin.png",
                      "--start",str(ti),
                      "--end",str(tf),
                      "--vertical-label=Datagramas/s",
                      "--title=Datagramas recibidos que no pudieron ser entregados\npor razones distintas a la falta de\naplicacion en el puerto destino",
                      "DEF:datagramsin="+name+":datagramsin:AVERAGE",
-                     "AREA:datagramsin#00FF00:Datagramas recibidos")
+                     "AREA:datagramsin#22577A:Datagramas recibidos")
 def generarReporte():
 
     file = open("data.txt","r")
@@ -236,11 +236,16 @@ def generarReporte():
     if(sistema == "Linux"):
         c.drawImage("linux.jpg",10,h-60,width=50,height=50)
     else:
-        c.drawImage("windows.jpg",10,h-60,width=50,height=50)
+        c.drawImage("windows.jpeg",10,h-60,width=50,height=50)
     c.setFont("Helvetica", 10)
     c.drawString(65, h-25, "SO: "+sistema+"  Version: "+version+"  Ubicacion: "+ubicacion)
     c.drawString(65, h-50, "Tiempo de actividad antes del ultimo reinicio: "+tiempo+"hrs  Comunidad: "+lines[int(op)].split("\t")[2].split(" ")[1]+"  IP: "+ip)
     c.line(0,h-65,w,h-65)
+    c.drawImage("multicast.png",10,h-185,width=w-20,height=110)
+    c.drawImage("ippackets.png",10,h-305,width=w-20,height=110)
+    c.drawImage("icmpme.png",10,h-425,width=w-20,height=110)
+    c.drawImage("segout.png",10,h-545,width=w-20,height=110)
+    c.drawImage("datagramsin.png",10,h-665,width=w-20,height=110)
     c.save()
    
 
