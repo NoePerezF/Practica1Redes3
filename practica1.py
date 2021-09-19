@@ -1,7 +1,32 @@
 from pysnmp.hlapi import *
 from pysnmp.proto.errind import DataMismatch
-
-
+import time
+import rrdtool
+import os
+def checkdb(name):
+    try:
+        with open(name, 'r') as f:
+            return True
+    except FileNotFoundError as e:
+        return False
+    except IOError as e:
+        return False
+def createdb(name):
+    ret = rrdtool.create(name,
+                     "--start",'N',
+                     "--step",'60',
+                     "DS:inmulti:COUNTER:600:U:U",
+                     "DS:ippackets:COUNTER:600:U:U",
+                     "DS:icmpme:COUNTER:600:U:U",
+                     "DS:segout:COUNTER:600:U:U",
+                     "DS:datagramsin:COUNTER:600:U:U",
+                     "RRA:AVERAGE:0.5:1:20",
+                     "RRA:AVERAGE:0.5:1:20",
+                     "RRA:AVERAGE:0.5:1:20",
+                     "RRA:AVERAGE:0.5:1:20",
+                     "RRA:AVERAGE:0.5:1:20")
+    if ret:
+        print (rrdtool.error())
 def consultaSNMP(comunidad,host,oid,port):
     errorIndication, errorStatus, errorIndex, varBinds = next(
         getCmd(SnmpEngine(),
@@ -53,7 +78,8 @@ def printMenu():
     print("1.- Agregar un agente")
     print("2.- Eliminar un agente")
     print("3.- Generar reporte")
-    print("4.- Salir")
+    print("4.- Capturar datos")
+    print("5.-Salir")
 def addAgent():
     print("Ingresa el nombre o direccion ip del host")
     ip = input()
@@ -66,6 +92,7 @@ def addAgent():
     file = open("data.txt",'a')
     file.write("\nDireccion: "+ip+"\tVersionSNMP: "+v+"\tComunidad: "+com+"\tPuerto: "+p)
     file.close()
+    createdb(ip+".rrd")
 def delAgent():
     agentes = []
     file = open("data.txt","r+")
@@ -82,11 +109,16 @@ def delAgent():
     delete = input()
     file.seek(0)
     file.truncate()
+    if os.path.exists(lines[int(delete)].split("\t")[0].split(" ")[1]+".rrd"):
+        os.remove(lines[int(delete)].split("\t")[0].split(" ")[1]+".rrd")
+    if os.path.exists(lines[int(delete)].split("\t")[0].split(" ")[1]+".xml"):
+        os.remove(lines[int(delete)].split("\t")[0].split(" ")[1]+".xml")
     del lines[int(delete)]
     print(lines)
     for l in lines:
         file.write(l)
     file.close()
+    
 def resumen():
     try:
         file = open("data.txt",'r')
@@ -103,6 +135,9 @@ def resumen():
                 dir = atr[0].split(" ")[1]
                 com = atr[2].split(" ")[1]
                 port = atr[3].split(" ")[1]
+                db = checkdb(dir+".rrd")
+                if(not db):
+                    createdb(dir+".rrd")
                 res = consultaSNMP(com,str(dir),"1.3.6.1.2.1.2.2.1.8.2",int(port))
                 if(res == '1'):
                     print(dir+': Up')
@@ -118,6 +153,43 @@ def resumen():
                     print("\t AdminStatus inteface "+str(i+1)+": "+estado)
                     res = consultaSNMP(com,str(dir),"1.3.6.1.2.1.2.2.1.2."+str(i+1),int(port))
                     print("\tDescripcion: "+res)
+def graph(name,ti,tf):
+    print(str(ti))
+    ret = rrdtool.graph( "multicast.png",
+                     "--start",str(ti),
+                     "--end",str(tf),
+                     "--vertical-label=Paquetes/s",
+                     "--title=Paquetes multicast recibidos",
+                     "DEF:inmulti="+name+":inmulti:AVERAGE",
+                     "AREA:inmulti#00FF00:Paquetes recibidos")
+    ret = rrdtool.graph( "ippackets.png",
+                     "--start",str(ti),
+                     "--end",str(tf),
+                     "--vertical-label=Paquetes/s",
+                     "--title=Paquetes recibidos exitosamente,entregados a\n protocolos IPv4",
+                     "DEF:ippackets="+name+":ippackets:AVERAGE",
+                     "AREA:ippackets#00FF00:Paquetes recibidos")
+    ret = rrdtool.graph( "icmpme.png",
+                     "--start",str(ti),
+                     "--end",str(tf),
+                     "--vertical-label=Mensajes/s",
+                     "--title=Mensajes de respuesta ICMP que se han enviado",
+                     "DEF:icmpme="+name+":icmpme:AVERAGE",
+                     "AREA:icmpme#00FF00:Mensaje enviados")
+    ret = rrdtool.graph( "segout.png",
+                     "--start",str(ti),
+                     "--end",str(tf),
+                     "--vertical-label=Segmentos/s",
+                     "--title=Segmentos enviados que contienen la bandera RST",
+                     "DEF:segout="+name+":segout:AVERAGE",
+                     "AREA:segout#00FF00:Segmentos enviados")
+    ret = rrdtool.graph( "datagramsin.png",
+                     "--start",str(ti),
+                     "--end",str(tf),
+                     "--vertical-label=Datagramas/s",
+                     "--title=Datagramas recibidos que no pudieron ser entregados\npor razones distintas a la falta de\naplicacion en el puerto destino",
+                     "DEF:datagramsin="+name+":datagramsin:AVERAGE",
+                     "AREA:datagramsin#00FF00:Datagramas recibidos")
 def generarReporte():
 
     file = open("data.txt","r")
@@ -128,8 +200,17 @@ def generarReporte():
         if( l != "\n"):
             dispositivo = l.split("\t")
             print(str(i)+".- "+dispositivo[0].split(" ")[1])
+            
             i+=1
     op = input()
+    print("Ingresa la fecha y hora de inicio (DD-MM-AAAA HH:MM)")
+    timeini = input()
+    timeini =time.mktime(time.strptime(timeini,"%d-%m-%Y %H:%M"))
+    print(timeini)
+    print("Ingresa la fecha y hora de termino ((DD-MM-AAAA HH:MM)")
+    timefin = input()
+    timefin =time.mktime(time.strptime(timefin,"%d-%m-%Y %H:%M"))
+    print(timefin)
     res = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.1.1.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
     if(len(res.split("Software")) > 1):
         sistema = res.split("Software")[1].split(" ")[1]
@@ -158,8 +239,33 @@ def generarReporte():
     
     datgramsIn = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.7.3.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
     print("Datagrams in: "+datgramsIn)
+    graph(lines[int(op)].split("\t")[0].split(" ")[1]+".rrd",int(timeini),int(timefin))
+def capturar():
+    file = open("data.txt","r")
+    lines = file.readlines()
+    print("Selecciona un dispositivo:")
+    i = 1
+    for l in lines:
+        if( l != "\n"):
+            dispositivo = l.split("\t")
+            print(str(i)+".- "+dispositivo[0].split(" ")[1])
+            
+            i+=1
+    op = input()
+    while(1):
+        inMulti = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.2.2.1.12.2",int(lines[int(op)].split("\t")[3].split(" ")[1]))
+        ipPackets = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.4.9.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
+        icmpMe = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.5.14.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
+        segOut = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.6.15.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
+        datgramsIn = consultaSNMP(lines[int(op)].split("\t")[2].split(" ")[1],lines[int(op)].split("\t")[0].split(" ")[1],"1.3.6.1.2.1.7.3.0",int(lines[int(op)].split("\t")[3].split(" ")[1]))
+        valor = "N:" + str(inMulti) + ':' + str(ipPackets) + ':' + str(icmpMe) + ':' + str(segOut) + ':' + str(datgramsIn)
+        print(valor)
+        rrdtool.update(lines[int(op)].split("\t")[0].split(" ")[1]+'.rrd', valor)
+        rrdtool.dump(lines[int(op)].split("\t")[0].split(" ")[1]+'.rrd',lines[int(op)].split("\t")[0].split(" ")[1]+'.xml')
+        time.sleep(1)
 
 resumen()
+
 while 1:
     printMenu()
     op = input()
@@ -169,5 +275,7 @@ while 1:
         delAgent()
     elif(int(op) == 3):
         generarReporte()
+    elif(int(op) == 4):
+        capturar()
     else:
         break
